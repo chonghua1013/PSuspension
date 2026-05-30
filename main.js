@@ -360,8 +360,8 @@ ipcMain.handle('open-clipboard', () => {
 // 翻译 - 百度翻译 API
 const crypto = require('crypto');
 ipcMain.handle('translate-text', async (_, q, from, to) => {
-  const appid = '20250815002431315';
-  const key = 'Kpemk_KxXZ2UsAzXV9qj';
+  const appid = '';
+  const key = '';
   const salt = Date.now().toString();
   const sign = crypto.createHash('md5').update(appid + q + salt + key).digest('hex');
   const url = `https://fanyi-api.baidu.com/api/trans/vip/translate?q=${encodeURIComponent(q)}&from=${from}&to=${to}&appid=${appid}&salt=${salt}&sign=${sign}`;
