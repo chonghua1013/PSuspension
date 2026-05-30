@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Tools Float bubble logo">
+  <defs>
+    <linearGradient id="tile" x1="184" y1="120" x2="840" y2="904" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F5FCFF"/>
+      <stop offset="0.55" stop-color="#DDF4FF"/>
+      <stop offset="1" stop-color="#BDE9FF"/>
+    </linearGradient>
+    <linearGradient id="bubbleBase" x1="300" y1="260" x2="760" y2="820" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F3FCFF" stop-opacity="0.78"/>
+      <stop offset="1" stop-color="#7DD3FC" stop-opacity="0.24"/>
+    </linearGradient>
+    <radialGradient id="bubbleShade" cx="62%" cy="70%" r="48%">
+      <stop offset="0" stop-color="#38BDF8" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#0EA5E9" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="highlightLarge" cx="33%" cy="25%" r="19%">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.96"/>
+      <stop offset="0.47" stop-color="#FFFFFF" stop-opacity="0.38"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="highlightSmall" cx="33%" cy="25%" r="19%">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.9"/>
+      <stop offset="0.47" stop-color="#FFFFFF" stop-opacity="0.34"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softShadow" x="-30%" y="-30%" width="160%" height="165%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="22" stdDeviation="28" flood-color="#0E7490" flood-opacity="0.1"/>
+    </filter>
+    <filter id="tinyShadow" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#0E7490" flood-opacity="0.08"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" rx="236" fill="url(#tile)"/>
+  <path d="M178 176C230 120 315 92 430 92h164c154 0 259 36 315 108 31 39 43 86 43 154v244c0 144-54 250-162 318-61 38-142 57-244 57H378c-81 0-148-14-201-43C99 889 60 819 60 720V330c0-63 39-118 118-154z" fill="#FFFFFF" opacity="0.12"/>
+
+  <g filter="url(#softShadow)">
+    <circle cx="526" cy="546" r="314" fill="url(#bubbleBase)" stroke="#7DD3FC" stroke-opacity="0.34" stroke-width="14"/>
+    <circle cx="526" cy="546" r="314" fill="url(#bubbleShade)"/>
+    <circle cx="526" cy="546" r="314" fill="url(#highlightLarge)"/>
+  </g>
+
+  <g filter="url(#tinyShadow)">
+    <circle cx="696" cy="348" r="143" fill="url(#bubbleBase)" stroke="#7DD3FC" stroke-opacity="0.3" stroke-width="14" opacity="0.82"/>
+    <circle cx="696" cy="348" r="143" fill="url(#bubbleShade)" opacity="0.82"/>
+    <circle cx="696" cy="348" r="143" fill="url(#highlightSmall)" opacity="0.82"/>
+  </g>
+
+  <g filter="url(#tinyShadow)">
+    <circle cx="662" cy="690" r="102" fill="url(#bubbleBase)" stroke="#7DD3FC" stroke-opacity="0.26" stroke-width="12" opacity="0.66"/>
+    <circle cx="662" cy="690" r="102" fill="url(#bubbleShade)" opacity="0.66"/>
+    <circle cx="662" cy="690" r="102" fill="url(#highlightSmall)" opacity="0.66"/>
+  </g>
+</svg>

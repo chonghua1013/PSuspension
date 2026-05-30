@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>悬浮球</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: #f0f7ff;
+      user-select: none;
+      border-radius: 14px;
+    }
+
+    html {
+      background: #f0f7ff;
+      border-radius: 14px;
+    }
+
+    [data-theme="dark"] body {
+      background: #1e1e2e;
+    }
+
+    [data-theme="dark"] html {
+      background: #1e1e2e;
+    }
+
+    :root,
+    [data-theme="light"] {
+      --bg: #f0f7ff;
+      --bg-secondary: #e1f0ff;
+      --surface: #d0e5ff;
+      --text: #1a3a5c;
+      --text-sub: #6b8aaa;
+      --accent: #4d96ff;
+      --logo-blue: #0ea5e9;
+      --logo-blue-dark: #0284c7;
+      --logo-blue-soft: #d7f1ff;
+      --green: #52c98a;
+      --red: #f0626e;
+      --yellow: #f0c060;
+      --peach: #f09c6e;
+      --mauve: #9b7ed8;
+      --teal: #4db8b0;
+      --radius: 14px;
+      --ball-size: 60px;
+      --collapsed-bg: #e1f0ff;
+    }
+
+    [data-theme="dark"] {
+      --bg: #1e1e2e;
+      --bg-secondary: #181825;
+      --surface: #313244;
+      --text: #cdd6f4;
+      --text-sub: #6c7086;
+      --accent: #89b4fa;
+      --green: #a6e3a1;
+      --red: #f38ba8;
+      --yellow: #f9e2af;
+      --peach: #fab387;
+      --mauve: #cba6f7;
+      --teal: #94e2d5;
+      --collapsed-bg: #1e1e2e;
+    }
+
+    /* ========== 悬浮球（收起状态） ========== */
+    .container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    /* 收起状态 */
+    .container.collapsed {
+      background: #f0f7ff;
+    }
+    [data-theme="dark"] .container.collapsed {
+      background: #1e1e2e;
+    }
+
+    /* 展开状态 */
+    .container.expanded {
+      background: var(--bg);
+    }
+
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 8px 24px rgba(14, 165, 233, 0.24), 0 0 0 0 rgba(125, 211, 252, 0.24); }
+      50%      { box-shadow: 0 10px 30px rgba(14, 165, 233, 0.34), 0 0 0 6px rgba(125, 211, 252, 0); }
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: scale(0.85); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    .ball-wrapper {
+      width: 60px; height: 60px;
+      position: absolute; top: 0; left: 0;
+      cursor: pointer; z-index: 10;
+      overflow: hidden;
+      border-radius: 14px;
+    }
+
+    .ball {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 20px rgba(14, 165, 233, 0.3);
+      transition: box-shadow 0.3s ease, transform 0.2s ease;
+      animation: pulse 3s ease-in-out infinite, slideIn 0.4s ease-out;
+      overflow: hidden;
+    }
+
+    .ball:hover {
+      transform: scale(1.06);
+      box-shadow: 0 6px 28px rgba(14, 165, 233, 0.5);
+    }
+
+    .ball:active {
+      transform: scale(1.06);
+      box-shadow: 0 2px 10px rgba(14, 165, 233, 0.25);
+    }
+
+    .ball-logo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+    }
+
+    .ball-mini-logo {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    /* ========== 工具面板（展开状态） ========== */
+    .panel {
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      border-radius: 16px;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 8px 40px rgba(14, 116, 144, 0.12), 0 0 0 1px rgba(137, 180, 250, 0.3);
+    }
+
+    .panel.active {
+      display: flex;
+    }
+
+    /* 面板头部 */
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--surface);
+      -webkit-app-region: drag;
+      cursor: move;
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      -webkit-app-region: drag;
+    }
+
+    .panel-title .ball-mini {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #89b4fa, #4d96ff);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .panel-actions {
+      display: flex;
+      gap: 6px;
+      -webkit-app-region: no-drag;
+    }
+
+    .btn-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      border: none;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: 0.2s;
+    }
+
+    .btn-icon:hover {
+      background: #c8ddff;
+    }
+
+    .btn-icon.danger:hover {
+      background: var(--red);
+      color: #fff;
+    }
+
+    /* 搜索框 */
+    .search-wrap {
+      padding: 10px 16px;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 9px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--surface);
+      background: var(--bg-secondary);
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      transition: 0.2s;
+    }
+
+    .search-input::placeholder {
+      color: var(--text-sub);
+    }
+
+    .search-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(137, 180, 250, 0.15);
+    }
+
+    /* 工具列表 */
+    .tools-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 12px 12px;
+    }
+
+    .tools-list::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .tools-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .tools-list::-webkit-scrollbar-thumb {
+      background: var(--surface);
+      border-radius: 2px;
+    }
+
+    .tool-category {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-sub);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 10px 6px 6px;
+    }
+
+    .tool-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: 0.15s;
+      margin-bottom: 2px;
+    }
+
+    .tool-item:hover {
+      background: var(--surface);
+    }
+
+    .tool-item:active {
+      transform: scale(0.98);
+      opacity: 0.8;
+    }
+
+    .tool-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .tool-icon.blue {
+      background: rgba(137, 180, 250, 0.2);
+    }
+    .tool-icon.green {
+      background: rgba(166, 227, 161, 0.2);
+    }
+    .tool-icon.red {
+      background: rgba(243, 139, 168, 0.2);
+    }
+    .tool-icon.yellow {
+      background: rgba(249, 226, 175, 0.2);
+    }
+    .tool-icon.peach {
+      background: rgba(250, 179, 135, 0.2);
+    }
+    .tool-icon.mauve {
+      background: rgba(203, 166, 247, 0.2);
+    }
+    .tool-icon.teal {
+      background: rgba(148, 226, 213, 0.2);
+    }
+
+    .tool-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .tool-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .tool-desc {
+      font-size: 11px;
+      color: var(--text-sub);
+      margin-top: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tool-shortcut {
+      font-size: 11px;
+      color: var(--text-sub);
+      background: var(--surface);
+      padding: 3px 7px;
+      border-radius: 5px;
+      flex-shrink: 0;
+    }
+
+    /* 底部状态栏 */
+    .panel-footer {
+      padding: 8px 16px;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--surface);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-sub);
+    }
+
+    .footer-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      display: inline-block;
+      margin-right: 4px;
+    }
+
+    /* 开机自启动开关 */
+    .auto-launch-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-sub);
+      cursor: pointer;
+      user-select: none;
+    }
+    .auto-launch-toggle .toggle-track {
+      width: 32px;
+      height: 18px;
+      border-radius: 9px;
+      background: var(--surface);
+      position: relative;
+      transition: 0.25s;
+    }
+    .auto-launch-toggle .toggle-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--text-sub);
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      transition: 0.25s;
+    }
+    .auto-launch-toggle.on .toggle-track {
+      background: var(--green);
+    }
+    .auto-launch-toggle.on .toggle-thumb {
+      left: 16px;
+      background: #fff;
+    }
+
+    /* 主题切换按钮 */
+    .theme-switch {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 14px;
+      background: var(--surface);
+      transition: 0.2s;
+    }
+    .theme-switch:hover {
+      background: var(--accent);
+    }
+    .theme-switch .theme-icon {
+      line-height: 1;
+    }
+
+    /* 截图预览 */
+    .screenshot-preview {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 9999;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: crosshair;
+    }
+
+    .screenshot-preview.active {
+      display: flex;
+    }
+
+    .screenshot-toolbar {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .screenshot-toolbar button {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    /* 颜色预览弹窗 */
+    .color-toast {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      background: var(--bg);
+      border-radius: 12px;
+      padding: 18px 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      text-align: center;
+      z-index: 100;
+    }
+
+    .color-toast.show {
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    .color-swatch {
+      width: 60px;
+      height: 60px;
+      border-radius: 12px;
+      margin: 0 auto 10px;
+      border: 2px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .color-code {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .color-code:hover {
+      color: var(--accent);
+    }
+
+    .color-hint {
+      font-size: 11px;
+      color: var(--text-sub);
+      margin-top: 4px;
+    }
+
+    /* 隐藏：未展开时显示球，展开时显示面板 */
+    .container.collapsed .ball-wrapper {
+      display: block;
+    }
+    .container.collapsed .panel {
+      display: none;
+    }
+
+    .container.expanded .ball-wrapper {
+      display: none;
+    }
+    .container.expanded .panel {
+      display: flex;
+    }
+
+    /* 默认：收起 */
+    .container {
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-start;
+    }
+
+    .container.collapsed .ball-wrapper {
+      display: flex;
+    }
+
+  </style>
+</head>
+<body>
+  <div class="container collapsed" id="container">
+    <!-- ====== 悬浮球 ====== -->
+    <div class="ball-wrapper" id="ballWrapper">
+      <div class="ball" id="ball">
+        <img class="ball-logo" src="assets/icon.png" alt="">
+      </div>
+    </div>
+
+    <!-- ====== 工具面板 ====== -->
+    <div class="panel" id="panel">
+      <!-- 头部 -->
+      <div class="panel-header" id="panelHeader">
+        <div class="panel-title">
+          <img class="ball-mini-logo" src="assets/icon.png" alt="">
+          工具箱
+        </div>
+        <div class="panel-actions">
+          <button class="btn-icon" id="btnMinimize" title="最小化">━</button>
+          <button class="btn-icon danger" id="btnClose" title="退出">✕</button>
+        </div>
+      </div>
+
+      <!-- 搜索 -->
+      <div class="search-wrap">
+        <input class="search-input" id="searchInput" placeholder="🔍 搜索工具...">
+      </div>
+
+      <!-- 工具列表 -->
+      <div class="tools-list" id="toolsList">
+        <!-- 屏幕工具 -->
+        <div class="tool-category">🖥 屏幕工具</div>
+        <div class="tool-item" data-tool="screenshot">
+          <div class="tool-icon blue">📸</div>
+          <div class="tool-info">
+            <div class="tool-name">截图</div>
+            <div class="tool-desc">全屏截图并保存</div>
+          </div>
+          <span class="tool-shortcut">⇧⌘S</span>
+        </div>
+        <div class="tool-item" data-tool="colorpicker">
+          <div class="tool-icon peach">🎨</div>
+          <div class="tool-info">
+            <div class="tool-name">取色器</div>
+            <div class="tool-desc">提取屏幕任意位置颜色</div>
+          </div>
+          <span class="tool-shortcut">⇧⌘C</span>
+        </div>
+
+        <!-- 办公工具 -->
+        <div class="tool-category">📋 办公工具</div>
+        <div class="tool-item" data-tool="clipboard">
+          <div class="tool-icon teal">📋</div>
+          <div class="tool-info">
+            <div class="tool-name">剪贴板</div>
+            <div class="tool-desc">查看和管理剪贴板内容</div>
+          </div>
+        </div>
+        <div class="tool-item" data-tool="notepad">
+          <div class="tool-icon green">📝</div>
+          <div class="tool-info">
+            <div class="tool-name">记事本</div>
+            <div class="tool-desc">快速记录和编辑文本</div>
+          </div>
+          <span class="tool-shortcut">⇧⌘N</span>
+        </div>
+        <div class="tool-item" data-tool="calculator">
+          <div class="tool-icon yellow">🔢</div>
+          <div class="tool-info">
+            <div class="tool-name">计算器</div>
+            <div class="tool-desc">科学计算器</div>
+          </div>
+          <span class="tool-shortcut">⇧⌘K</span>
+        </div>
+
+        <!-- 文件工具 -->
+        <div class="tool-category">📁 文件工具</div>
+        <div class="tool-item" data-tool="filefilter">
+          <div class="tool-icon green">📁</div>
+          <div class="tool-info">
+            <div class="tool-name">文件筛选</div>
+            <div class="tool-desc">按日期筛选并复制文件</div>
+          </div>
+        </div>
+
+        <!-- 表格工具 -->
+        <div class="tool-category">📊 表格工具</div>
+        <div class="tool-item" data-tool="spreadsheet">
+          <div class="tool-icon teal">📊</div>
+          <div class="tool-info">
+            <div class="tool-name">悬浮表格</div>
+            <div class="tool-desc">类Excel表格 常驻桌面</div>
+          </div>
+        </div>
+
+        <!-- 翻译工具 -->
+        <div class="tool-category">🌐 翻译工具</div>
+        <div class="tool-item" data-tool="translator">
+          <div class="tool-icon red">🌐</div>
+          <div class="tool-info">
+            <div class="tool-name">翻译</div>
+            <div class="tool-desc">百度翻译 多语言互译</div>
+          </div>
+          <span class="tool-shortcut">⇧⌘T</span>
+        </div>
+
+        <!-- 开发工具 -->
+        <div class="tool-category">🔧 开发工具</div>
+        <div class="tool-item" data-tool="timestamp">
+          <div class="tool-icon blue">🕐</div>
+          <div class="tool-info">
+            <div class="tool-name">时间戳转换</div>
+            <div class="tool-desc">时间戳与日期时间相互转换</div>
+          </div>
+          <span class="tool-shortcut">⇧⌘U</span>
+        </div>
+        <div class="tool-item" data-tool="jsonviewer">
+          <div class="tool-icon yellow">{ }</div>
+          <div class="tool-info">
+            <div class="tool-name">JSON 查看器</div>
+            <div class="tool-desc">JSON 树形展开/收起格式化</div>
+          </div>
+        </div>
+
+        <!-- 系统工具 -->
+        <div class="tool-category">⚙️ 系统工具</div>
+        <div class="tool-item" data-tool="sysinfo">
+          <div class="tool-icon mauve">🖥</div>
+          <div class="tool-info">
+            <div class="tool-name">系统信息</div>
+            <div class="tool-desc">查看CPU、内存等系统状态</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部 -->
+      <div class="panel-footer">
+        <span><span class="footer-dot"></span>运行中</span>
+        <div class="theme-switch" id="themeSwitch" title="切换深色/浅色主题">
+          <span class="theme-icon">🌙</span>
+        </div>
+        <div class="auto-launch-toggle" id="autoLaunchToggle" title="开机自启动">
+          <div class="toggle-track"><div class="toggle-thumb"></div></div>
+          <span>开机启动</span>
+        </div>
+        <span id="footerTime"></span>
+      </div>
+
+      <!-- 颜色Toast -->
+      <div class="color-toast" id="colorToast">
+        <div class="color-swatch" id="colorSwatch"></div>
+        <div class="color-code" id="colorCode"></div>
+        <div class="color-hint">点击复制颜色值</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const container = document.getElementById('container');
+    const ball = document.getElementById('ball');
+    const ballWrapper = document.getElementById('ballWrapper');
+    const panel = document.getElementById('panel');
+    const panelHeader = document.getElementById('panelHeader');
+    const searchInput = document.getElementById('searchInput');
+    const toolsList = document.getElementById('toolsList');
+    const colorToast = document.getElementById('colorToast');
+    const colorSwatch = document.getElementById('colorSwatch');
+    const colorCode = document.getElementById('colorCode');
+    const footerTime = document.getElementById('footerTime');
+
+    // ====== 初始化：根据平台更新快捷键显示 ======
+    (async function initPlatformShortcuts() {
+      const platform = await window.electronAPI.getPlatform();
+      const isMac = platform.isMac;
+      if (!isMac) {
+        const shortcutEls = document.querySelectorAll('.tool-shortcut');
+        shortcutEls.forEach(el => {
+          el.textContent = el.textContent.replace(/⇧⌘/g, 'Shift+Ctrl+');
+        });
+      }
+    })();
+
+    // ====== 拖拽移动 ======
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let mouseMoved = false;
+    let rafPending = false;
+    let pendingDeltaX = 0;
+    let pendingDeltaY = 0;
+
+    function flushMove() {
+      if (pendingDeltaX !== 0 || pendingDeltaY !== 0) {
+        window.electronAPI.moveWindow(pendingDeltaX, pendingDeltaY);
+        pendingDeltaX = 0;
+        pendingDeltaY = 0;
+      }
+      rafPending = false;
+    }
+
+    // 球拖拽
+    ballWrapper.addEventListener('mousedown', (e) => {
+      if (container.classList.contains('expanded')) return;
+      isDragging = true;
+      mouseMoved = false;
+      dragStartX = e.screenX;
+      dragStartY = e.screenY;
+      e.preventDefault();
+    });
+
+    // 面板头部拖拽
+    panelHeader.addEventListener('mousedown', (e) => {
+      if (e.target.tagName === 'BUTTON') return;
+      isDragging = true;
+      mouseMoved = false;
+      dragStartX = e.screenX;
+      dragStartY = e.screenY;
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const deltaX = e.screenX - dragStartX;
+      const deltaY = e.screenY - dragStartY;
+      if (Math.abs(deltaX) > 2 || Math.abs(deltaY) > 2) {
+        mouseMoved = true;
+      }
+      if (mouseMoved) {
+        dragStartX = e.screenX;
+        dragStartY = e.screenY;
+        // 累积增量，用 RAF 批量发送
+        pendingDeltaX += deltaX;
+        pendingDeltaY += deltaY;
+        if (!rafPending) {
+          rafPending = true;
+          requestAnimationFrame(flushMove);
+        }
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+      // 延迟重置，让 click 事件能读到正确的拖拽状态
+      setTimeout(() => { mouseMoved = false; }, 10);
+    });
+
+    ballWrapper.addEventListener('click', (e) => {
+      if (container.classList.contains('expanded')) return;
+      if (mouseMoved) return;
+      e.preventDefault();
+      expandPanel();
+    });
+
+    // ====== 面板展开/收起 ======
+    async function expandPanel() {
+      await window.electronAPI.togglePanel();
+    }
+
+    async function collapsePanel() {
+      await window.electronAPI.togglePanel();
+    }
+
+    // 监听面板状态变化
+    window.electronAPI.onPanelState((state) => {
+      if (state === 'expanded') {
+        container.classList.remove('collapsed');
+        container.classList.add('expanded');
+        searchInput.focus();
+      } else {
+        container.classList.remove('expanded');
+        container.classList.add('collapsed');
+      }
+    });
+
+    // 点击面板外部空白区域收起
+    // (通过右键球收起)
+    ball.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      if (container.classList.contains('expanded')) {
+        collapsePanel();
+      }
+    });
+
+    // ====== 最小化和退出 ======
+    document.getElementById('btnMinimize').addEventListener('click', () => {
+      collapsePanel();
+    });
+
+    document.getElementById('btnClose').addEventListener('click', () => {
+      window.electronAPI.quitApp();
+    });
+
+    // ====== 搜索过滤 ======
+    searchInput.addEventListener('input', () => {
+      const query = searchInput.value.toLowerCase().trim();
+      const items = toolsList.querySelectorAll('.tool-item');
+      const categories = toolsList.querySelectorAll('.tool-category');
+
+      let anyVisible = false;
+      categories.forEach(cat => cat.style.display = 'none');
+
+      items.forEach(item => {
+        const name = item.querySelector('.tool-name').textContent.toLowerCase();
+        const desc = item.querySelector('.tool-desc').textContent.toLowerCase();
+        if (!query || name.includes(query) || desc.includes(query)) {
+          item.style.display = 'flex';
+          anyVisible = true;
+          // 显示对应分类
+          let prev = item.previousElementSibling;
+          while (prev) {
+            if (prev.classList.contains('tool-category')) {
+              prev.style.display = 'block';
+              break;
+            }
+            prev = prev.previousElementSibling;
+          }
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    });
+
+    // ====== 工具点击 ======
+    toolsList.addEventListener('click', async (e) => {
+      const item = e.target.closest('.tool-item');
+      if (!item) return;
+
+      const tool = item.dataset.tool;
+
+      // 点击动画
+      item.style.transform = 'scale(0.96)';
+      setTimeout(() => { item.style.transform = ''; }, 150);
+
+      switch (tool) {
+        case 'screenshot':
+          await handleScreenshot();
+          break;
+        case 'colorpicker':
+          await handleColorPicker();
+          break;
+        case 'clipboard':
+          await handleClipboard();
+          break;
+        case 'notepad':
+          await window.electronAPI.openNotepad();
+          break;
+        case 'calculator':
+          await window.electronAPI.openCalculator();
+          break;
+        case 'translator':
+          await window.electronAPI.openTranslator();
+          break;
+        case 'filefilter':
+          await window.electronAPI.openFileFilter();
+          break;
+        case 'spreadsheet':
+          await window.electronAPI.openSpreadsheet();
+          break;
+        case 'timestamp':
+          await window.electronAPI.openTimestamp();
+          break;
+        case 'jsonviewer':
+          await window.electronAPI.openJsonViewer();
+          break;
+        case 'sysinfo':
+          await handleSystemInfo();
+          break;
+      }
+    });
+
+    // ====== 截图 ======
+    async function handleScreenshot() {
+      try {
+        const imgData = await window.electronAPI.screenshot();
+        if (!imgData) return;
+
+        // 创建一个 canvas 来保存
+        const img = new Image();
+        img.src = imgData;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+
+          // 复制到剪贴板
+          canvas.toBlob(async (blob) => {
+            try {
+              await navigator.clipboard.write([
+                new ClipboardItem({ 'image/png': blob })
+              ]);
+              showToast('✅ 截图已复制到剪贴板');
+            } catch (err) {
+              // fallback: 下载
+              const link = document.createElement('a');
+              link.download = 'screenshot_' + Date.now() + '.png';
+              link.href = imgData;
+              link.click();
+              showToast('💾 截图已下载');
+            }
+          }, 'image/png');
+        };
+      } catch (e) {
+        showToast('❌ 截图失败: ' + e.message);
+      }
+    }
+
+    // ====== 取色器 ======
+    async function handleColorPicker() {
+      try {
+        const color = await window.electronAPI.pickColor();
+        if (!color) return;
+
+        colorSwatch.style.background = color.hex;
+        colorCode.textContent = color.hex + '  ' + color.rgb;
+        colorToast.classList.add('show');
+
+        // 复制到剪贴板
+        window.electronAPI.copyText(color.hex);
+
+        setTimeout(() => {
+          colorToast.classList.remove('show');
+        }, 3000);
+      } catch (e) {
+        showToast('❌ 取色失败: ' + e.message);
+      }
+    }
+
+    colorCode.addEventListener('click', () => {
+      const text = colorCode.textContent.split('  ')[0];
+      window.electronAPI.copyText(text);
+      showToast('✅ 已复制 ' + text);
+    });
+
+    // ====== 剪贴板 ======
+    async function handleClipboard() {
+      await window.electronAPI.openClipboard();
+    }
+
+    // ====== 系统信息 ======
+    async function handleSystemInfo() {
+      const info = await window.electronAPI.systemInfo();
+      const msg = [
+        `🖥 系统: ${info.platform} (${info.arch})`,
+        `💻 主机: ${info.hostname}`,
+        `🧠 CPU: ${info.cpuModel}`,
+        `  核心数: ${info.cpuCores}`,
+        `💾 总内存: ${info.totalMem}`,
+        `  可用: ${info.freeMem}`,
+        `⏱ 运行时间: ${info.uptime}`,
+      ].join('\n');
+      alert(msg);
+    }
+
+    // ====== Toast 提示 ======
+    let toastTimer = null;
+    function showToast(msg) {
+      // 简单实现：用 color toast 区域
+      colorSwatch.style.display = 'none';
+      colorCode.textContent = msg;
+      colorCode.style.fontSize = '14px';
+      colorToast.classList.add('show');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        colorToast.classList.remove('show');
+        colorSwatch.style.display = 'block';
+        colorCode.style.fontSize = '16px';
+      }, 2000);
+    }
+
+    // ====== 键盘快捷键 ======
+    document.addEventListener('keydown', async (e) => {
+      // 只在面板展开时响应
+      if (container.classList.contains('collapsed')) return;
+
+      const isMod = e.metaKey || e.ctrlKey;
+
+      if (isMod && e.key === 's') {
+        e.preventDefault();
+        await handleScreenshot();
+      } else if (isMod && e.key === 'c') {
+        e.preventDefault();
+        await handleColorPicker();
+      } else if (isMod && e.key === 'n') {
+        e.preventDefault();
+        await window.electronAPI.openNotepad();
+      } else if (isMod && e.key === 'k') {
+        e.preventDefault();
+        await window.electronAPI.openCalculator();
+      } else if (e.key === 'Escape') {
+        collapsePanel();
+      } else if (isMod && e.key === 'f') {
+        e.preventDefault();
+        searchInput.focus();
+      }
+    });
+
+    // ====== 时钟 ======
+    function updateTime() {
+      const now = new Date();
+      footerTime.textContent = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    }
+    updateTime();
+    setInterval(updateTime, 10000);
+
+    // ====== 主题切换 ======
+    const themeSwitch = document.getElementById('themeSwitch');
+    const themeIcon = themeSwitch.querySelector('.theme-icon');
+    const THEME_KEY = 'float_theme';
+    const savedTheme = localStorage.getItem(THEME_KEY) || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    themeIcon.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+
+    themeSwitch.addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      themeIcon.textContent = next === 'dark' ? '☀️' : '🌙';
+      localStorage.setItem(THEME_KEY, next);
+      // 同步主题到主进程（通知其他工具窗口）
+      window.electronAPI.setTheme(next);
+    });
+
+    // ====== 开机自启动 ======
+    const autoLaunchToggle = document.getElementById('autoLaunchToggle');
+    (async function initAutoLaunch() {
+      const enabled = await window.electronAPI.getAutoLaunch();
+      if (enabled) autoLaunchToggle.classList.add('on');
+    })();
+
+    autoLaunchToggle.addEventListener('click', async () => {
+      const isOn = autoLaunchToggle.classList.contains('on');
+      const newState = await window.electronAPI.setAutoLaunch(!isOn);
+      if (newState) {
+        autoLaunchToggle.classList.add('on');
+      } else {
+        autoLaunchToggle.classList.remove('on');
+      }
+    });
+
+    // ====== 窗口失焦自动收起 ======
+    window.addEventListener('blur', () => {
+      // 重置拖拽状态，防止 mouseup 误判
+      isDragging = false;
+      mouseMoved = false;
+      // 通知主进程强制收起窗口（不会 toggle，只执行收起）
+      window.electronAPI.forceCollapse();
+    });
+
+    // ====== 初始化 ======
+    console.log('🚀 桌面悬浮球已就绪');
+  </script>
+</body>
+</html>
