@@ -101,7 +101,7 @@ npm run build:all
 | `Cmd/Ctrl + Shift + K` | 计算器 |
 | `Cmd/Ctrl + Shift + T` | 翻译 |
 | `Cmd/Ctrl + Shift + U` | 时间戳转换 |
-| `Cmd/Ctrl + Shift + F` | 全局显示/隐藏悬浮球 |
+| `Cmd/Ctrl + Shift + H` | 全局显示/隐藏悬浮球 |
 | `Cmd/Ctrl + F` | 搜索工具（面板展开时） |
 | `Esc` | 收起面板 |
 

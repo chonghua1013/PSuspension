@@ -1612,7 +1612,7 @@ app.whenReady().then(() => {
     console.log('[启动] 窗口创建成功');
     startClipboardWatcher();
     console.log('[启动] 剪贴板监控已启动');
-    globalShortcut.register('CommandOrControl+Shift+F', () => { if (mainWindow) mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show(); });
+    globalShortcut.register('CommandOrControl+Shift+H', () => { if (mainWindow) mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show(); });
     console.log('[启动] 全局快捷键已注册');
   } catch (err) {
     console.error('[启动失败]', err.message, err.stack);
