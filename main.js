@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, globalShortcut, clipboard, nativeImage, desktopCapturer, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, globalShortcut, clipboard, nativeImage, desktopCapturer, dialog, Notification } = require('electron');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -1612,6 +1612,8 @@ app.whenReady().then(() => {
     console.log('[启动] 窗口创建成功');
     startClipboardWatcher();
     console.log('[启动] 剪贴板监控已启动');
+    startReminderChecker();
+    console.log('[启动] 提醒定时检查已启动');
     globalShortcut.register('CommandOrControl+Shift+H', () => { if (mainWindow) mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show(); });
     console.log('[启动] 全局快捷键已注册');
   } catch (err) {
@@ -1649,5 +1651,160 @@ ipcMain.handle('set-theme', (_, theme) => {
   Object.values(toolWindows).forEach(w => {
     try { if (!w.isDestroyed()) w.webContents.send('theme-changed', theme); } catch(e) {}
   });
+  // 通知提醒窗口
+  if (toolWindows.reminder && !toolWindows.reminder.isDestroyed()) {
+    try { toolWindows.reminder.webContents.send('theme-changed', theme); } catch(e) {}
+  }
   return theme;
+});
+
+// ====== 提醒管理 ======
+const REMINDER_FILE = path.join(app.getPath('userData'), 'reminders.json');
+let reminders = [];
+let reminderCheckTimer = null;
+// 记录今天已触发过的提醒ID（避免重复弹通知）
+let triggeredToday = new Set();
+
+function loadReminders() {
+  try {
+    if (fs.existsSync(REMINDER_FILE)) {
+      reminders = JSON.parse(fs.readFileSync(REMINDER_FILE, 'utf-8'));
+    }
+  } catch(e) {
+    console.error('[提醒] 加载失败:', e.message);
+    reminders = [];
+  }
+}
+
+function saveReminders() {
+  try {
+    const dir = path.dirname(REMINDER_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(REMINDER_FILE, JSON.stringify(reminders, null, 2), 'utf-8');
+  } catch(e) {
+    console.error('[提醒] 保存失败:', e.message);
+  }
+}
+
+// 检查到期提醒
+function checkDeadlineReminders() {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayKey = today.toISOString().slice(0, 10);
+
+  reminders.forEach(r => {
+    if (r.type !== 'deadline') return;
+    if (triggeredToday.has(r.id + '_' + todayKey)) return;
+
+    const deadline = new Date(r.deadline);
+    deadline.setHours(0, 0, 0, 0);
+    const diffDays = Math.ceil((deadline - today) / 86400000);
+
+    // 在提醒窗口内：提前 advanceDays 天开始提醒 + 当天提醒
+    // 已过期也提醒
+    if (diffDays <= r.advanceDays) {
+      triggeredToday.add(r.id + '_' + todayKey);
+      sendReminderNotification(r, diffDays);
+    }
+  });
+}
+
+// 检查周期提醒
+function checkRepeatReminders() {
+  const now = new Date();
+  const todayKey = now.toISOString().slice(0, 10);
+  const currentDay = now.getDay(); // 0=日, 1-6=一~六
+  const currentTime = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+
+  reminders.forEach(r => {
+    if (r.type !== 'repeat') return;
+    if (!r.days || !r.days.includes(currentDay)) return;
+    if (r.time !== currentTime) return; // 精确匹配到分钟
+    if (triggeredToday.has(r.id + '_' + todayKey)) return;
+
+    triggeredToday.add(r.id + '_' + todayKey);
+    sendReminderNotification(r, null);
+  });
+}
+
+function sendReminderNotification(reminder, diffDays) {
+  const body = reminder.type === 'deadline'
+    ? (diffDays < 0 ? '⚠️ 已过期！' : diffDays === 0 ? '📅 今天到期！' : `⏰ 还有 ${diffDays} 天到期`)
+    : `🔁 周期提醒 - ${reminder.time}`;
+
+  // 系统通知
+  if (Notification.isSupported()) {
+    const n = new Notification({
+      title: '🔔 ' + reminder.name,
+      body: body + (reminder.note ? '\n' + reminder.note : ''),
+      urgency: reminder.type === 'deadline' && (diffDays < 0 || diffDays === 0) ? 'critical' : 'normal',
+    });
+    n.show();
+  }
+
+  // 通知提醒窗口（如果打开着）
+  if (toolWindows.reminder && !toolWindows.reminder.isDestroyed()) {
+    try {
+      toolWindows.reminder.webContents.send('reminder-triggered', reminder);
+    } catch(e) {}
+  }
+}
+
+function startReminderChecker() {
+  loadReminders();
+  // 每天0点重置触发记录
+  const now = new Date();
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const msUntilMidnight = tomorrow - now;
+  setTimeout(() => {
+    triggeredToday = new Set();
+    setInterval(() => { triggeredToday = new Set(); }, 86400000);
+  }, msUntilMidnight);
+
+  // 每30秒检查一次
+  reminderCheckTimer = setInterval(() => {
+    checkDeadlineReminders();
+    checkRepeatReminders();
+  }, 30000);
+
+  // 启动时立即检查一次
+  checkDeadlineReminders();
+  checkRepeatReminders();
+}
+
+// ====== 提醒窗口 ======
+ipcMain.handle('open-reminder', () => {
+  markToolWindowOpening();
+  collapsePanel(true);
+  if (toolWindows.reminder) { toolWindows.reminder.focus(); return; }
+  const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
+  const w = new BrowserWindow({
+    width: 480, height: 560,
+    x: Math.round(sw/2-240), y: Math.round(sh/2-280),
+    frame: true, title: '到期提醒',
+    webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js') }
+  });
+  w.loadFile(path.join(__dirname, 'reminder.html'));
+  w.on('closed', () => { toolWindows.reminder = null; });
+  toolWindows.reminder = w;
+  injectThemeSupport(w);
+});
+
+ipcMain.handle('get-reminders', () => reminders);
+ipcMain.handle('save-reminder', (_, reminder) => {
+  const idx = reminders.findIndex(r => r.id === reminder.id);
+  if (idx >= 0) {
+    // 更新时保留原有的 createdAt
+    if (!reminder.createdAt) reminder.createdAt = reminders[idx].createdAt;
+    reminders[idx] = reminder;
+  } else {
+    reminders.push(reminder);
+  }
+  saveReminders();
+  return true;
+});
+ipcMain.handle('delete-reminder', (_, id) => {
+  reminders = reminders.filter(r => r.id !== id);
+  saveReminders();
+  return true;
 });

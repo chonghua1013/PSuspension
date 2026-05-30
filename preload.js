@@ -54,6 +54,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAutoLaunch: () => ipcRenderer.invoke('get-auto-launch'),
   setAutoLaunch: (enable) => ipcRenderer.invoke('set-auto-launch', enable),
 
+  // 提醒
+  openReminder: () => ipcRenderer.invoke('open-reminder'),
+  getReminders: () => ipcRenderer.invoke('get-reminders'),
+  saveReminder: (reminder) => ipcRenderer.invoke('save-reminder', reminder),
+  deleteReminder: (id) => ipcRenderer.invoke('delete-reminder', id),
+  onReminderTriggered: (callback) => ipcRenderer.on('reminder-triggered', (_, reminder) => callback(reminder)),
+
   // 应用控制
   minimizeAll: () => ipcRenderer.send('minimize-all'),
   quitApp: () => ipcRenderer.send('quit-app'),

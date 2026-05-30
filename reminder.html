@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>到期提醒</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,sans-serif;background:#1e1e2e;color:#cdd6f4;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.hd{background:#181825;padding:12px 16px;border-bottom:1px solid #313244;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.hd h2{font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px}
+.hd button{padding:6px 14px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500}
+.btn-add{background:#a6e3a1;color:#1e1e2e}.btn-add:hover{opacity:.85}
+
+.list{flex:1;overflow-y:auto;padding:8px 12px}
+.list::-webkit-scrollbar{width:4px}
+.list::-webkit-scrollbar-thumb{background:#45475a;border-radius:2px}
+.empty{text-align:center;padding:40px 20px;color:#6c7086;font-size:13px}
+.empty .icon{font-size:36px;margin-bottom:8px}
+
+.card{background:#181825;border-radius:10px;padding:14px;margin-bottom:8px;border:1px solid #313244;position:relative}
+.card.urgent{border-color:#f38ba8}
+.card.soon{border-color:#f9e2af}
+.card .title{font-size:14px;font-weight:500;color:#cdd6f4;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.card .title .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.card .dot.urgent{background:#f38ba8}
+.card .dot.soon{background:#f9e2af}
+.card .dot.normal{background:#a6e3a1}
+.card .info{font-size:12px;color:#6c7086;line-height:1.6}
+.card .info .deadline{color:#f38ba8;font-weight:500}
+.card .info .repeat{color:#89b4fa}
+.card .actions{position:absolute;top:10px;right:12px;display:flex;gap:4px}
+.card .actions button{width:26px;height:26px;border-radius:6px;border:none;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;background:transparent;color:#6c7086}
+.card .actions button:hover{background:#f38ba8;color:#fff}
+.card .tag{display:inline-block;font-size:10px;padding:2px 6px;border-radius:4px;margin-right:4px}
+.tag.deadline{background:rgba(243,139,168,.15);color:#f38ba8}
+.tag.repeat{background:rgba(137,180,250,.15);color:#89b4fa}
+
+/* 弹窗 */
+.overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);z-index:100;display:none;align-items:center;justify-content:center}
+.overlay.show{display:flex}
+.modal{background:#1e1e2e;border-radius:14px;padding:24px;width:380px;max-height:90vh;overflow-y:auto;border:1px solid #313244;box-shadow:0 12px 48px rgba(0,0,0,.5)}
+.modal h3{font-size:16px;margin-bottom:16px;color:#cdd6f4}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:12px;color:#6c7086;margin-bottom:5px;font-weight:500}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:9px 12px;border-radius:8px;border:1px solid #313244;background:#181825;color:#cdd6f4;font-size:13px;outline:none}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:#89b4fa;box-shadow:0 0 0 3px rgba(137,180,250,.15)}
+.form-group textarea{resize:vertical;min-height:60px}
+.form-row{display:flex;gap:10px}
+.form-row .form-group{flex:1}
+.type-tabs{display:flex;gap:8px;margin-bottom:16px}
+.type-tab{flex:1;padding:10px;border-radius:8px;border:1px solid #313244;background:#181825;color:#6c7086;cursor:pointer;text-align:center;font-size:13px;transition:.2s}
+.type-tab.active{border-color:#89b4fa;background:rgba(137,180,250,.1);color:#89b4fa}
+.type-tab:hover{border-color:#45475a}
+.weekday-btns{display:flex;gap:4px;flex-wrap:wrap}
+.weekday-btn{width:34px;height:34px;border-radius:50%;border:1px solid #313244;background:#181825;color:#6c7086;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:.15s}
+.weekday-btn.active{background:#89b4fa;color:#1e1e2e;border-color:#89b4fa}
+.weekday-btn:hover{border-color:#45475a}
+.modal-actions{display:flex;gap:8px;margin-top:20px}
+.modal-actions button{flex:1;padding:10px;border-radius:8px;border:none;cursor:pointer;font-size:14px;font-weight:500}
+.btn-save{background:#a6e3a1;color:#1e1e2e}.btn-save:hover{opacity:.85}
+.btn-cancel{background:#45475a;color:#cdd6f4}.btn-cancel:hover{background:#585b70}
+
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#a6e3a1;color:#1e1e2e;padding:8px 18px;border-radius:8px;font-size:13px;font-weight:500;opacity:0;transition:opacity .3s;pointer-events:none;z-index:200}
+.toast.show{opacity:1}
+
+/* 浅色主题覆盖 */
+[data-theme="light"] body{background:#f0f7ff;color:#1a3a5c}
+[data-theme="light"] .hd,[data-theme="light"] .card,[data-theme="light"] .modal{background:#e1f0ff}
+[data-theme="light"] .card{border-color:#d0e5ff}
+[data-theme="light"] .form-group input,[data-theme="light"] .form-group select,[data-theme="light"] .form-group textarea,[data-theme="light"] .type-tab,[data-theme="light"] .weekday-btn{background:#f0f7ff;color:#1a3a5c;border-color:#d0e5ff}
+[data-theme="light"] .type-tab.active{background:rgba(77,150,255,.1);color:#4d96ff;border-color:#4d96ff}
+[data-theme="light"] .card .title{color:#1a3a5c}
+[data-theme="light"] .btn-cancel{background:#d0e5ff;color:#1a3a5c}
+[data-theme="light"] .modal{background:#f0f7ff;border-color:#d0e5ff}
+[data-theme="light"] .card.urgent{border-color:#f0626e}
+[data-theme="light"] .card.soon{border-color:#f0c060}
+</style>
+</head>
+<body>
+
+<div class="hd">
+  <h2><span>⏰</span> 到期提醒</h2>
+  <button class="btn-add" id="btnAdd">+ 新建提醒</button>
+</div>
+
+<div class="list" id="list">
+  <div class="empty"><div class="icon">🔔</div>暂无提醒<br><span style="font-size:11px">点击上方按钮添加</span></div>
+</div>
+
+<!-- 编辑弹窗 -->
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal">
+    <h3 id="modalTitle">新建提醒</h3>
+    <div class="type-tabs">
+      <div class="type-tab active" data-type="deadline" id="tabDeadline">📅 到期提醒</div>
+      <div class="type-tab" data-type="repeat" id="tabRepeat">🔁 周期提醒</div>
+    </div>
+    <form id="form">
+      <div class="form-group">
+        <label>提醒名称</label>
+        <input type="text" id="fName" placeholder="例如：项目验收截止" required>
+      </div>
+      <div class="form-group">
+        <label>备注（可选）</label>
+        <textarea id="fNote" placeholder="附加说明..."></textarea>
+      </div>
+
+      <!-- 到期提醒字段 -->
+      <div id="deadlineFields">
+        <div class="form-group">
+          <label>到期日期</label>
+          <input type="date" id="fDeadline">
+        </div>
+        <div class="form-group">
+          <label>提前几天提醒</label>
+          <select id="fAdvance">
+            <option value="0">当天提醒</option>
+            <option value="1">提前 1 天</option>
+            <option value="3" selected>提前 3 天</option>
+            <option value="7">提前 7 天</option>
+            <option value="14">提前 14 天</option>
+            <option value="30">提前 30 天</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 周期提醒字段 -->
+      <div id="repeatFields" style="display:none">
+        <div class="form-group">
+          <label>提醒时间</label>
+          <input type="time" id="fTime" value="09:00">
+        </div>
+        <div class="form-group">
+          <label>重复星期</label>
+          <div class="weekday-btns" id="weekdayBtns">
+            <div class="weekday-btn active" data-day="1">一</div>
+            <div class="weekday-btn active" data-day="2">二</div>
+            <div class="weekday-btn active" data-day="3">三</div>
+            <div class="weekday-btn active" data-day="4">四</div>
+            <div class="weekday-btn active" data-day="5">五</div>
+            <div class="weekday-btn" data-day="6">六</div>
+            <div class="weekday-btn" data-day="0">日</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" id="btnCancel">取消</button>
+        <button type="submit" class="btn-save" id="btnSave">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const list = document.getElementById('list');
+const overlay = document.getElementById('overlay');
+const modal = document.getElementById('modal');
+const modalTitle = document.getElementById('modalTitle');
+const form = document.getElementById('form');
+const btnAdd = document.getElementById('btnAdd');
+const btnCancel = document.getElementById('btnCancel');
+const toast = document.getElementById('toast');
+const tabDeadline = document.getElementById('tabDeadline');
+const tabRepeat = document.getElementById('tabRepeat');
+const deadlineFields = document.getElementById('deadlineFields');
+const repeatFields = document.getElementById('repeatFields');
+const weekdayBtns = document.getElementById('weekdayBtns');
+
+let editingId = null;
+let reminderType = 'deadline';
+
+function showToast(msg) {
+  toast.textContent = msg; toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+// 类型切换
+tabDeadline.addEventListener('click', () => {
+  reminderType = 'deadline';
+  tabDeadline.classList.add('active');
+  tabRepeat.classList.remove('active');
+  deadlineFields.style.display = '';
+  repeatFields.style.display = 'none';
+});
+tabRepeat.addEventListener('click', () => {
+  reminderType = 'repeat';
+  tabRepeat.classList.add('active');
+  tabDeadline.classList.remove('active');
+  deadlineFields.style.display = 'none';
+  repeatFields.style.display = '';
+});
+
+// 星期按钮
+weekdayBtns.querySelectorAll('.weekday-btn').forEach(btn => {
+  btn.addEventListener('click', () => btn.classList.toggle('active'));
+});
+
+// 打开/关闭弹窗
+btnAdd.addEventListener('click', () => {
+  editingId = null;
+  modalTitle.textContent = '新建提醒';
+  form.reset();
+  reminderType = 'deadline';
+  tabDeadline.classList.add('active');
+  tabRepeat.classList.remove('active');
+  deadlineFields.style.display = '';
+  repeatFields.style.display = 'none';
+  document.getElementById('fTime').value = '09:00';
+  weekdayBtns.querySelectorAll('.weekday-btn').forEach((b,i) => {
+    b.classList.toggle('active', i < 5);
+  });
+  overlay.classList.add('show');
+});
+btnCancel.addEventListener('click', () => overlay.classList.remove('show'));
+overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('show'); });
+
+// 保存
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('fName').value.trim();
+  if (!name) { showToast('请输入提醒名称'); return; }
+
+  const reminder = {
+    id: editingId || Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    name,
+    note: document.getElementById('fNote').value.trim(),
+    type: reminderType,
+    createdAt: editingId ? undefined : Date.now(),
+  };
+
+  if (reminderType === 'deadline') {
+    const dl = document.getElementById('fDeadline').value;
+    if (!dl) { showToast('请选择到期日期'); return; }
+    reminder.deadline = dl;
+    reminder.advanceDays = parseInt(document.getElementById('fAdvance').value);
+  } else {
+    reminder.time = document.getElementById('fTime').value;
+    reminder.days = [];
+    weekdayBtns.querySelectorAll('.weekday-btn.active').forEach(b => {
+      reminder.days.push(parseInt(b.dataset.day));
+    });
+    if (reminder.days.length === 0) { showToast('请选择至少一个星期'); return; }
+  }
+
+  await window.electronAPI.saveReminder(reminder);
+  overlay.classList.remove('show');
+  showToast(editingId ? '✅ 已更新' : '✅ 已添加');
+  await refresh();
+});
+
+// 删除
+async function deleteReminder(id) {
+  if (!confirm('确定删除这个提醒？')) return;
+  await window.electronAPI.deleteReminder(id);
+  showToast('🗑 已删除');
+  await refresh();
+}
+
+// 渲染列表
+function formatDate(dateStr) {
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function getDayName(day) {
+  return ['日','一','二','三','四','五','六'][day];
+}
+
+function getDaysUntil(deadline) {
+  const now = new Date(); now.setHours(0,0,0,0);
+  const dl = new Date(deadline); dl.setHours(0,0,0,0);
+  return Math.ceil((dl - now) / 86400000);
+}
+
+async function refresh() {
+  const reminders = await window.electronAPI.getReminders();
+  list.innerHTML = '';
+  if (!reminders || reminders.length === 0) {
+    list.innerHTML = '<div class="empty"><div class="icon">🔔</div>暂无提醒<br><span style="font-size:11px">点击上方按钮添加</span></div>';
+    return;
+  }
+  reminders.sort((a, b) => {
+    if (a.type === 'deadline' && b.type === 'deadline') return a.deadline.localeCompare(b.deadline);
+    if (a.type === 'deadline') return -1;
+    if (b.type === 'deadline') return 1;
+    return a.time.localeCompare(b.time);
+  });
+  reminders.forEach(r => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    let status = 'normal', statusClass = 'normal', info = '';
+
+    if (r.type === 'deadline') {
+      const days = getDaysUntil(r.deadline);
+      if (days < 0) { status = '已过期'; statusClass = 'urgent'; }
+      else if (days <= r.advanceDays) { status = `${days} 天后到期`; statusClass = days <= 1 ? 'urgent' : 'soon'; }
+      else { status = `${days} 天后到期`; }
+      info = `<span class="deadline">📅 到期日: ${formatDate(r.deadline)}</span> &nbsp; 提前 ${r.advanceDays} 天提醒`;
+    } else {
+      const days = r.days.map(d => '周' + getDayName(d)).join('、');
+      info = `<span class="repeat">🔁 每${days} ${r.time}</span>`;
+    }
+
+    card.innerHTML = `
+      <div class="actions">
+        <button onclick="deleteReminder('${r.id}')" title="删除">×</button>
+      </div>
+      <div class="title"><span class="dot ${statusClass}"></span>${r.name}</div>
+      <div class="info">${info}${r.note ? '<br>📝 ' + r.note : ''}</div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+// 监听主进程触发的提醒（弹通知）
+window.electronAPI.onReminderTriggered((reminder) => {
+  // 简单方式：在窗口标题栏闪烁
+  document.title = '🔔 ' + reminder.name + ' - 到期提醒';
+  setTimeout(() => { document.title = '到期提醒'; }, 5000);
+});
+
+// 初始加载
+refresh();
+
+// 定时刷新（每分钟更新倒计时）
+setInterval(refresh, 60000);
+</script>
+</body>
+</html>

@@ -597,6 +597,13 @@
 
         <!-- 办公工具 -->
         <div class="tool-category">📋 办公工具</div>
+        <div class="tool-item" data-tool="reminder">
+          <div class="tool-icon yellow">⏰</div>
+          <div class="tool-info">
+            <div class="tool-name">到期提醒</div>
+            <div class="tool-desc">到期日/周期提醒管理</div>
+          </div>
+        </div>
         <div class="tool-item" data-tool="clipboard">
           <div class="tool-icon teal">📋</div>
           <div class="tool-info">
@@ -911,6 +918,9 @@
           break;
         case 'sysinfo':
           await handleSystemInfo();
+          break;
+        case 'reminder':
+          await window.electronAPI.openReminder();
           break;
       }
     });
