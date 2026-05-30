@@ -115,6 +115,7 @@ PSuspension/
 ├── index.html       # 渲染进程（悬浮球 UI + 工具面板）
 ├── preload.js       # 预加载脚本（安全暴露 IPC API）
 ├── package.json     # 项目配置与构建脚本
+├── config.json      # API 密钥配置（不提交到 Git）
 ├── .npmrc           # npm 镜像配置
 └── assets/          # 图标与静态资源
 ```
@@ -123,11 +124,18 @@ PSuspension/
 
 ### 翻译 API
 
-项目使用百度翻译开放平台 API，如需更换为自己的密钥，请修改 `main.js` 中的：
+项目使用百度翻译开放平台 API。密钥存放在 `config.json` 中，该文件已加入 `.gitignore`，不会提交到仓库。
 
-```javascript
-const appid = '你的APP ID';
-const key = '你的密钥';
+首次使用时，复制并编辑配置文件：
+
+```bash
+# 编辑 config.json，填入你的密钥
+{
+  "baiduTranslate": {
+    "appid": "你的APP ID",
+    "key": "你的密钥"
+  }
+}
 ```
 
 ### 开机自启动

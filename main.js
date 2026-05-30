@@ -359,9 +359,22 @@ ipcMain.handle('open-clipboard', () => {
 
 // 翻译 - 百度翻译 API
 const crypto = require('crypto');
+
+// 从配置文件读取 API 密钥
+let translateConfig = { appid: '', key: '' };
+try {
+  const configPath = path.join(__dirname, 'config.json');
+  if (fs.existsSync(configPath)) {
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    translateConfig = config.baiduTranslate || translateConfig;
+  }
+} catch (e) {
+  console.warn('[翻译] 读取 config.json 失败，翻译功能将不可用:', e.message);
+}
+
 ipcMain.handle('translate-text', async (_, q, from, to) => {
-  const appid = '';
-  const key = '';
+  const { appid, key } = translateConfig;
+  if (!appid || !key) return '翻译功能未配置，请在 config.json 中设置百度翻译 API 密钥';
   const salt = Date.now().toString();
   const sign = crypto.createHash('md5').update(appid + q + salt + key).digest('hex');
   const url = `https://fanyi-api.baidu.com/api/trans/vip/translate?q=${encodeURIComponent(q)}&from=${from}&to=${to}&appid=${appid}&salt=${salt}&sign=${sign}`;
