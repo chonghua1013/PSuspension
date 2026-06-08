@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   filterFiles: (dir, startDate, endDate) => ipcRenderer.invoke('filter-files', dir, startDate, endDate),
   copyFiles: (files, dest) => ipcRenderer.invoke('copy-files', files, dest),
+  clearFolder: (dir) => ipcRenderer.invoke('clear-folder', dir),
   systemInfo: () => ipcRenderer.invoke('system-info'),
 
   // 取色器/截图窗口专用

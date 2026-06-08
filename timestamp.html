@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,sans-serif;background:#1e1e2e;color:#cdd6f4;padding:20px;display:flex;flex-direction:column;height:100vh;gap:16px}
+h2{font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px}
+h2 span{font-size:20px}
+.card{background:#181825;border-radius:12px;padding:16px;border:1px solid #313244}
+.card-title{font-size:13px;color:#6c7086;margin-bottom:12px;font-weight:500}
+.row{display:flex;gap:8px;align-items:center}
+.row input,.row select{flex:1;padding:9px 12px;border-radius:8px;border:1px solid #313244;background:#1e1e2e;color:#cdd6f4;font-size:14px;outline:none;font-family:monospace}
+.row input:focus,.row select:focus{border-color:#89b4fa;box-shadow:0 0 0 3px rgba(137,180,250,.15)}
+.row button{padding:9px 16px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;white-space:nowrap}
+.btn-go{background:#89b4fa;color:#1e1e2e}.btn-go:hover{opacity:.85}
+.btn-now{background:#a6e3a1;color:#1e1e2e}.btn-now:hover{opacity:.85}
+.result{margin-top:10px;padding:12px;background:#1e1e2e;border-radius:8px;min-height:44px;display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.result .val{font-family:monospace;font-size:15px;color:#a6e3a1;word-break:break-all;flex:1}
+.result .val.empty{color:#6c7086}
+.copy-btn{padding:4px 10px;border:none;border-radius:6px;cursor:pointer;font-size:11px;background:#45475a;color:#cdd6f4;flex-shrink:0}
+.copy-btn:hover{background:#cba6f7;color:#1e1e2e}
+.hint{font-size:11px;color:#6c7086;margin-top:6px}
+</style>
+</head>
+<body>
+
+<h2><span>🕐</span> 时间戳转换</h2>
+
+<div class="card">
+  <div class="card-title">📅 时间戳 → 日期时间</div>
+  <div class="row">
+    <input type="text" id="tsIn" placeholder="输入时间戳（秒或毫秒）" autofocus>
+    <button class="btn-go" id="btnTsToDate">转换</button>
+    <button class="btn-now" id="btnNowTs">当前</button>
+  </div>
+  <div class="hint">支持 10 位（秒）或 13 位（毫秒）时间戳，自动识别</div>
+  <div class="result" id="tsResult">
+    <span class="val empty">等待输入...</span>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">⏰ 日期时间 → 时间戳</div>
+  <div class="row">
+    <input type="text" id="dtIn" placeholder="YYYY-MM-DD HH:mm:ss">
+    <button class="btn-go" id="btnDateToTs">转换</button>
+    <button class="btn-now" id="btnNowDt">当前</button>
+  </div>
+  <div class="hint">支持格式: 2024-01-15 14:30:00 或 2024/01/15 14:30:00</div>
+  <div class="result" id="dtResult">
+    <span class="val empty">等待输入...</span>
+  </div>
+</div>
+
+<script>
+const tsIn=document.getElementById('tsIn'),tsResult=document.getElementById('tsResult');
+const dtIn=document.getElementById('dtIn'),dtResult=document.getElementById('dtResult');
+
+function pad(n){return String(n).padStart(2,'0')}
+function formatDate(d){
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+
+    pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+}
+
+function makeResultEl(tsSec,tsMs,dateStr){
+  var wrap=document.createElement('div');
+  wrap.style.cssText='display:flex;flex-direction:column;gap:6px;width:100%';
+  var val=document.createElement('span');
+  val.className='val';val.textContent=dateStr;
+  var info=document.createElement('span');
+  info.style.cssText='color:#6c7086;font-size:12px;font-family:monospace';
+  info.textContent='秒: '+tsSec+' | 毫秒: '+tsMs;
+  var btns=document.createElement('div');
+  btns.style.cssText='display:flex;gap:6px';
+  var btn1=document.createElement('button');
+  btn1.className='copy-btn';btn1.textContent='复制秒';btn1.onclick=function(){copyText(tsSec,btn1)};
+  var btn2=document.createElement('button');
+  btn2.className='copy-btn';btn2.textContent='复制毫秒';btn2.onclick=function(){copyText(tsMs,btn2)};
+  var btn3=document.createElement('button');
+  btn3.className='copy-btn';btn3.textContent='复制日期';btn3.onclick=function(){copyText(dateStr,btn3)};
+  btns.appendChild(btn1);btns.appendChild(btn2);btns.appendChild(btn3);
+  wrap.appendChild(val);wrap.appendChild(info);wrap.appendChild(btns);
+  return wrap;
+}
+
+function tsToDate(){
+  var v=tsIn.value.trim();
+  if(!v){tsResult.innerHTML='<span class="val empty">请输入时间戳</span>';return}
+  var ts=parseInt(v);
+  if(isNaN(ts)){tsResult.innerHTML='<span class="val" style="color:#f38ba8">无效的时间戳</span>';return}
+  if(String(ts).length>=13){}else{ts*=1000}
+  var d=new Date(ts);
+  if(isNaN(d.getTime())){tsResult.innerHTML='<span class="val" style="color:#f38ba8">无效的时间戳</span>';return}
+  var sec=Math.floor(ts/1000),ms=ts;
+  tsResult.innerHTML='';tsResult.appendChild(makeResultEl(sec,ms,formatDate(d)));
+}
+
+function dateToTs(){
+  var v=dtIn.value.trim();
+  if(!v){dtResult.innerHTML='<span class="val empty">请输入日期时间</span>';return}
+  var d=new Date(v.replace(/\//g,'-'));
+  if(isNaN(d.getTime())){dtResult.innerHTML='<span class="val" style="color:#f38ba8">无效的日期格式</span>';return}
+  var ms=d.getTime(),sec=Math.floor(ms/1000);
+  dtResult.innerHTML='';dtResult.appendChild(makeResultEl(sec,ms,formatDate(d)));
+}
+
+function setNowTs(){tsIn.value=Math.floor(Date.now()/1000);tsToDate()}
+function setNowDt(){dtIn.value=formatDate(new Date());dateToTs()}
+
+function copyText(text,btn){
+  window.electronAPI.copyText(text).then(function(){
+    btn.textContent='✓ 已复制';
+    setTimeout(function(){btn.textContent=btn.textContent.replace('✓ ','复制')},1500);
+  }).catch(function(){});
+}
+
+document.getElementById('btnTsToDate').addEventListener('click',tsToDate);
+document.getElementById('btnNowTs').addEventListener('click',setNowTs);
+document.getElementById('btnDateToTs').addEventListener('click',dateToTs);
+document.getElementById('btnNowDt').addEventListener('click',setNowDt);
+tsIn.addEventListener('keydown',function(e){if(e.key==='Enter')tsToDate()});
+dtIn.addEventListener('keydown',function(e){if(e.key==='Enter')dateToTs()});
+
+// 主题支持
+(async function(){
+  try{var t=await window.electronAPI.getTheme();document.documentElement.setAttribute('data-theme',t||'light');
+  window.electronAPI.onThemeChanged(function(nt){document.documentElement.setAttribute('data-theme',nt)});}catch(e){}
+})();
+
+setNowTs();
+</script>
+</body>
+</html>

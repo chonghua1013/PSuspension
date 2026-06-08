@@ -56,10 +56,18 @@ function createWindow() {
     console.error('[窗口] 加载失败:', errorCode, errorDescription, validatedURL);
     dialog.showErrorBox('页面加载失败', `错误码: ${errorCode}\n${errorDescription}\nURL: ${validatedURL}`);
   });
-  mainWindow.loadFile('index.html').catch(err => {
-    console.error('[窗口] loadFile 失败:', err.message);
-    dialog.showErrorBox('文件加载失败', err.message);
-  });
+  // 加载 index.html，带重试（解决 macOS App Translocation 偶发加载失败）
+  function loadMainPage(retries = 3) {
+    mainWindow.loadFile(path.join(__dirname, 'index.html')).catch(err => {
+      console.error('[窗口] loadFile 失败:', err.message, '剩余重试:', retries - 1);
+      if (retries > 1) {
+        setTimeout(() => loadMainPage(retries - 1), 500);
+      } else {
+        dialog.showErrorBox('文件加载失败', err.message + '\n\n请尝试将应用从 DMG 拖到应用程序文件夹后再打开。');
+      }
+    });
+  }
+  loadMainPage();
   mainWindow.on('blur', () => collapsePanel());
   console.log('[窗口] 主窗口创建完成');
 }
@@ -127,16 +135,19 @@ ipcMain.handle('screenshot', async () => {
   const d = screen.getPrimaryDisplay(), { x, y, width, height } = d.bounds, sf = d.scaleFactor;
   return new Promise(resolve => {
     const w = new BrowserWindow({ width, height, x, y, frame: false, transparent: true, alwaysOnTop: true, resizable: false, hasShadow: false, skipTaskbar: true,
-      webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js') } });
+      webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js'), webSecurity: false } });
     // macOS: screen-saver 级别确保在所有窗口之上；Windows: 用 floating 级别
     if (isMac) {
       w.setAlwaysOnTop(true, 'screen-saver');
     } else {
       w.setAlwaysOnTop(true, 'floating');
     }
-    w.loadURL(`data:text/html,${encodeURIComponent(sc_html)}`);
+    const scTmpFile = path.join(os.tmpdir(), 'toolsfloat_screenshot.html');
+    fs.writeFileSync(scTmpFile, sc_html, 'utf-8');
+    w.loadFile(scTmpFile);
     ipcMain.once('crop-done', async (_, rect) => {
       try { w.close(); } catch(e) {}
+      try { fs.unlinkSync(scTmpFile); } catch(e) {}
       if (!rect || rect.w < 5 || rect.h < 5) { if (mainWindow) mainWindow.show(); resolve(null); return; }
       await new Promise(r => setTimeout(r, 200));
       const src = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: width*sf, height: height*sf } });
@@ -148,7 +159,7 @@ ipcMain.handle('screenshot', async () => {
       if (mainWindow) mainWindow.show();
       resolve(cropped.toDataURL());
     });
-    ipcMain.once('crop-cancel', () => { try { w.close(); } catch(e) {} if (mainWindow) mainWindow.show(); resolve(null); });
+    ipcMain.once('crop-cancel', () => { try { w.close(); } catch(e) {} try { fs.unlinkSync(scTmpFile); } catch(e) {} if (mainWindow) mainWindow.show(); resolve(null); });
   });
 });
 
@@ -228,10 +239,12 @@ ipcMain.handle('open-notepad', () => {
   collapsePanel(true);
   if (toolWindows.notepad) { toolWindows.notepad.focus(); return; }
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
-  const w = new BrowserWindow({ width: 400, height: 500, x: Math.round(sw/2-200), y: Math.round(sh/2-250), frame: true, title: '记事本',
-    webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js') } });
-  w.loadURL(`data:text/html,${encodeURIComponent(notepad_html)}`);
-  w.on('closed', () => { toolWindows.notepad = null; });
+  const w = new BrowserWindow({ width: 800, height: 500, x: Math.round(sw/2-400), y: Math.round(sh/2-250), frame: true, title: '记事本',
+    webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js'), webSecurity: false } });
+  const tmpFile = path.join(os.tmpdir(), 'toolsfloat_notepad.html');
+  fs.writeFileSync(tmpFile, notepad_html, 'utf-8');
+  w.loadFile(tmpFile);
+  w.on('closed', () => { toolWindows.notepad = null; try { fs.unlinkSync(tmpFile); } catch(e) {} });
   toolWindows.notepad = w;
   injectThemeSupport(w);
 });
@@ -242,10 +255,12 @@ ipcMain.handle('open-calculator', () => {
   collapsePanel(true);
   if (toolWindows.calculator) { toolWindows.calculator.focus(); return; }
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
-  const w = new BrowserWindow({ width: 320, height: 460, x: Math.round(sw/2-160), y: Math.round(sh/2-230), frame: true, title: '计算器', resizable: false,
-    webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js') } });
-  w.loadURL(`data:text/html,${encodeURIComponent(calc_html)}`);
-  w.on('closed', () => { toolWindows.calculator = null; });
+  const w = new BrowserWindow({ width: 800, height: 460, x: Math.round(sw/2-400), y: Math.round(sh/2-230), frame: true, title: '计算器', resizable: false,
+    webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js'), webSecurity: false } });
+  const tmpFile = path.join(os.tmpdir(), 'toolsfloat_calc.html');
+  fs.writeFileSync(tmpFile, calc_html, 'utf-8');
+  w.loadFile(tmpFile);
+  w.on('closed', () => { toolWindows.calculator = null; try { fs.unlinkSync(tmpFile); } catch(e) {} });
   toolWindows.calculator = w;
   injectThemeSupport(w);
 });
@@ -349,10 +364,12 @@ ipcMain.handle('open-clipboard', () => {
   collapsePanel(true);
   if (toolWindows.clipboard) { toolWindows.clipboard.focus(); return; }
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
-  const w = new BrowserWindow({ width: 440, height: 500, x: Math.round(sw/2-220), y: Math.round(sh/2-250), frame: true, title: '剪贴板历史',
-    webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js') } });
-  w.loadURL(`data:text/html,${encodeURIComponent(clipboard_html)}`);
-  w.on('closed', () => { toolWindows.clipboard = null; });
+  const w = new BrowserWindow({ width: 800, height: 500, x: Math.round(sw/2-400), y: Math.round(sh/2-250), frame: true, title: '剪贴板历史',
+    webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js'), webSecurity: false } });
+  const tmpFile = path.join(os.tmpdir(), 'toolsfloat_clipboard.html');
+  fs.writeFileSync(tmpFile, clipboard_html, 'utf-8');
+  w.loadFile(tmpFile);
+  w.on('closed', () => { toolWindows.clipboard = null; try { fs.unlinkSync(tmpFile); } catch(e) {} });
   toolWindows.clipboard = w;
   injectThemeSupport(w);
 });
@@ -448,18 +465,36 @@ ipcMain.handle('copy-files', async (_, fileList, dest) => {
   return { copied };
 });
 
+ipcMain.handle('clear-folder', async (_, dir) => {
+  if (!dir || !fs.existsSync(dir)) return { error: '目录不存在' };
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    let deleted = 0;
+    for (const e of entries) {
+      const fp = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        fs.rmSync(fp, { recursive: true, force: true });
+      } else {
+        fs.unlinkSync(fp);
+      }
+      deleted++;
+    }
+    return { deleted };
+  } catch (e) {
+    return { error: e.message };
+  }
+});
+
 // 文件筛选窗口
 ipcMain.handle('open-file-filter', () => {
   markToolWindowOpening();
   collapsePanel(true);
   if (toolWindows.fileFilter) { toolWindows.fileFilter.focus(); return; }
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
-  const w = new BrowserWindow({ width: 500, height: 440, x: Math.round(sw/2-250), y: Math.round(sh/2-240), frame: true, title: '文件筛选',
+  const w = new BrowserWindow({ width: 800, height: 440, x: Math.round(sw/2-400), y: Math.round(sh/2-240), frame: true, title: '文件筛选',
     webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js') } });
-  const tmpFile = path.join(os.tmpdir(), 'toolsfloat_filefilter.html');
-  fs.writeFileSync(tmpFile, file_html, 'utf-8');
-  w.loadFile(tmpFile);
-  w.on('closed', () => { toolWindows.fileFilter = null; try { fs.unlinkSync(tmpFile); } catch(e) {} });
+  w.loadFile(path.join(__dirname, 'filefilter.html'));
+  w.on('closed', () => { toolWindows.fileFilter = null; });
   toolWindows.fileFilter = w;
   injectThemeSupport(w);
 });
@@ -470,7 +505,7 @@ ipcMain.handle('open-spreadsheet', () => {
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
   const w = new BrowserWindow({ width: 800, height: 500, x: Math.round(sw/2-400), y: Math.round(sh/2-250),
     frame: true, title: '悬浮表格', alwaysOnTop: true,
-    webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js') } });
+    webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js'), webSecurity: false } });
   const tmpFile = path.join(os.tmpdir(), 'toolsfloat_sheet.html');
   fs.writeFileSync(tmpFile, sheet_html, 'utf-8');
   w.loadFile(tmpFile);
@@ -485,10 +520,12 @@ ipcMain.handle('open-translator', () => {
   collapsePanel(true);
   if (toolWindows.translator) { toolWindows.translator.focus(); return; }
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
-  const w = new BrowserWindow({ width: 420, height: 480, x: Math.round(sw/2-210), y: Math.round(sh/2-240), frame: true, title: '翻译',
-    webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js') } });
-  w.loadURL(`data:text/html,${encodeURIComponent(trans_html)}`);
-  w.on('closed', () => { toolWindows.translator = null; });
+  const w = new BrowserWindow({ width: 800, height: 480, x: Math.round(sw/2-400), y: Math.round(sh/2-240), frame: true, title: '翻译',
+    webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js'), webSecurity: false } });
+  const tmpFile = path.join(os.tmpdir(), 'toolsfloat_translator.html');
+  fs.writeFileSync(tmpFile, trans_html, 'utf-8');
+  w.loadFile(tmpFile);
+  w.on('closed', () => { toolWindows.translator = null; try { fs.unlinkSync(tmpFile); } catch(e) {} });
   toolWindows.translator = w;
   injectThemeSupport(w);
 });
@@ -499,9 +536,9 @@ ipcMain.handle('open-timestamp', () => {
   collapsePanel(true);
   if (toolWindows.timestamp) { toolWindows.timestamp.focus(); return; }
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
-  const w = new BrowserWindow({ width: 480, height: 420, x: Math.round(sw/2-240), y: Math.round(sh/2-210), frame: true, title: '时间戳转换', resizable: false,
-    webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js') } });
-  w.loadURL(`data:text/html,${encodeURIComponent(timestamp_html)}`);
+  const w = new BrowserWindow({ width: 800, height: 420, x: Math.round(sw/2-400), y: Math.round(sh/2-210), frame: true, title: '时间戳转换', resizable: false,
+    webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js'), webSecurity: false } });
+  w.loadFile(path.join(__dirname, 'timestamp.html'));
   w.on('closed', () => { toolWindows.timestamp = null; });
   toolWindows.timestamp = w;
   injectThemeSupport(w);
@@ -513,8 +550,8 @@ ipcMain.handle('open-json-viewer', () => {
   collapsePanel(true);
   if (toolWindows.jsonViewer) { toolWindows.jsonViewer.focus(); return; }
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
-  const w = new BrowserWindow({ width: 500, height: 560, x: Math.round(sw/2-250), y: Math.round(sh/2-280), frame: true, title: 'JSON 查看器',
-    webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js') } });
+  const w = new BrowserWindow({ width: 800, height: 560, x: Math.round(sw/2-400), y: Math.round(sh/2-280), frame: true, title: 'JSON 查看器',
+    webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js'), webSecurity: false } });
   const tmpFile = path.join(os.tmpdir(), 'toolsfloat_jsonviewer.html');
   fs.writeFileSync(tmpFile, json_html, 'utf-8');
   w.loadFile(tmpFile);
@@ -688,7 +725,7 @@ const file_html = `<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8"><s
 <div class="row"><label>源文件夹</label><span class="path" id="src"></span><button onclick="pickSrc()">选择</button></div>
 <div class="row"><label>开始日期</label><input type="date" id="d1"></div>
 <div class="row"><label>结束日期</label><input type="date" id="d2"></div>
-<div class="row"><label>目标目录</label><span class="path" id="dst"></span><button onclick="pickDst()">选择</button></div>
+<div class="row"><label>目标目录</label><span class="path" id="dst"></span><button onclick="pickDst()">选择</button><button onclick="clearDst()" style="background:#f38ba8;margin-left:4px">清空目录</button></div>
 <div class="btns"><button class="btn-go" onclick="go()">开始筛选并复制</button><button class="btn-cc" onclick="clr()">清空</button></div>
 <div id="log"></div>
 <script>
@@ -719,6 +756,15 @@ async function pickSrc(){
 async function pickDst(){
   dst=await window.electronAPI.selectFolder();
   if(dst){document.getElementById('dst').textContent=dst;saveCache()}
+}
+async function clearDst(){
+  if(!dst){log('请先选择目标目录','err');return}
+  if(!confirm('确定要清空目标目录「'+dst+'」下的所有文件吗？\n此操作不可恢复！'))return
+  try{
+    var r=await window.electronAPI.clearFolder(dst);
+    if(r.error){log('清空失败: '+r.error,'err')}
+    else{log('已清空目录，删除了 '+r.deleted+' 个文件/文件夹','ok')}
+  }catch(e){log('清空失败: '+e,'err')}
 }
 function log(m,c){const l=document.getElementById('log');l.innerHTML+='<div class="'+c+'">'+m+'</div>';l.scrollTop=l.scrollHeight}
 function clr(){document.getElementById('log').innerHTML='';files=[]}
@@ -1127,8 +1173,11 @@ h2 span{font-size:20px}
 </div>
 
 <script>
+console.log('[timestamp] script start');
+try{
 const tsIn=document.getElementById('tsIn'),tsResult=document.getElementById('tsResult');
 const dtIn=document.getElementById('dtIn'),dtResult=document.getElementById('dtResult');
+console.log('[timestamp] DOM elements ready');
 
 function pad(n){return String(n).padStart(2,'0')}
 
@@ -1138,15 +1187,15 @@ function formatDate(d){
 }
 
 function makeResultEl(tsSec,tsMs,dateStr){
-  const html='<span class="val">'+dateStr+'</span>'+
+  return '<span class="val">'+dateStr+'</span>'+
     '<span style="color:#6c7086;font-size:12px;font-family:monospace">秒: '+tsSec+' | 毫秒: '+tsMs+'</span>'+
-    '<button class="copy-btn" onclick="copyText(\''+tsSec+'\')">复制秒</button>'+
-    '<button class="copy-btn" onclick="copyText(\''+tsMs+'\')">复制毫秒</button>'+
-    '<button class="copy-btn" onclick="copyText(\''+dateStr+'\')">复制日期</button>';
-  return html;
+    '<button class="copy-btn" data-text="'+tsSec+'">复制秒</button>'+
+    '<button class="copy-btn" data-text="'+tsMs+'">复制毫秒</button>'+
+    '<button class="copy-btn" data-text="'+dateStr+'">复制日期</button>';
 }
 
 function tsToDate(){
+  console.log('[tsToDate] called');
   const v=tsIn.value.trim();
   if(!v){tsResult.innerHTML='<span class="val empty">请输入时间戳</span>';return}
   let ts=parseInt(v);
@@ -1156,10 +1205,12 @@ function tsToDate(){
   const d=new Date(ts);
   if(isNaN(d.getTime())){tsResult.innerHTML='<span class="val" style="color:#f38ba8">无效的时间戳</span>';return}
   const sec=Math.floor(ts/1000), ms=ts;
+  console.log('[tsToDate] result:', sec, ms, formatDate(d));
   tsResult.innerHTML=makeResultEl(sec,ms,formatDate(d));
 }
 
 function dateToTs(){
+  console.log('[dateToTs] called');
   const v=dtIn.value.trim();
   if(!v){dtResult.innerHTML='<span class="val empty">请输入日期时间</span>';return}
   // 支持 - 或 / 分隔符
@@ -1170,6 +1221,7 @@ function dateToTs(){
 }
 
 function setNowTs(){
+  console.log('[setNowTs] called');
   const ms=Date.now(), sec=Math.floor(ms/1000);
   tsIn.value=sec;
   tsToDate();
@@ -1180,21 +1232,31 @@ function setNowDt(){
   dateToTs();
 }
 
-function copyText(text){
-  navigator.clipboard.writeText(text).then(()=>{
+function copyText(text, btn){
+  window.electronAPI.copyText(text).then(()=>{
     const btns=document.querySelectorAll('.copy-btn');
     btns.forEach(b=>{if(b.textContent.includes('已复制'))b.textContent=b.textContent.replace('已复制','复制')});
-    event.target.textContent='✓ 已复制';
-    setTimeout(()=>{event.target.textContent='复制'+event.target.textContent.replace('✓ ','')},1500);
+    btn.textContent='✓ 已复制';
+    setTimeout(()=>{btn.textContent='复制'+btn.textContent.replace('✓ ','')},1500);
   }).catch(()=>{});
 }
+
+// 为动态生成的复制按钮绑定事件（事件委托）
+document.addEventListener('click', function(e){
+  var btn = e.target.closest('.copy-btn');
+  if(!btn || !btn.dataset.text) return;
+  copyText(btn.dataset.text, btn);
+});
 
 // 回车触发转换
 tsIn.addEventListener('keydown',e=>{if(e.key==='Enter')tsToDate()});
 dtIn.addEventListener('keydown',e=>{if(e.key==='Enter')dateToTs()});
 
 // 初始化：自动填入当前时间戳
-setNowTs();
+console.log('[timestamp] calling setNowTs');
+try{setNowTs()}catch(e){console.error('[timestamp] setNowTs error:',e)}
+console.log('[timestamp] script end');
+}catch(e){console.error('[timestamp] init error:',e)}
 </script></body></html>`;
 
 const json_html = `<!DOCTYPE html><html lang="zh"><head><meta charset="UTF-8"><style>
@@ -1614,7 +1676,7 @@ app.whenReady().then(() => {
     console.log('[启动] 剪贴板监控已启动');
     startReminderChecker();
     console.log('[启动] 提醒定时检查已启动');
-    globalShortcut.register('CommandOrControl+Shift+H', () => { if (mainWindow) mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show(); });
+    globalShortcut.register('CommandOrControl+Shift+Z', () => { if (mainWindow) mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show(); });
     console.log('[启动] 全局快捷键已注册');
   } catch (err) {
     console.error('[启动失败]', err.message, err.stack);
@@ -1631,15 +1693,21 @@ app.on('activate', () => { console.log('[激活]'); if (!mainWindow) createWindo
 
 // ====== 开机自启动 ======
 ipcMain.handle('get-auto-launch', () => {
-  return app.getLoginItemSettings().openAtLogin;
+  const settings = app.getLoginItemSettings();
+  return settings.openAtLogin;
 });
 
 ipcMain.handle('set-auto-launch', (_, enable) => {
+  // macOS: 不传 path 让系统自动使用当前应用的 bundle 路径
+  // 传 process.execPath 在打包后可能指向错误的临时路径
   app.setLoginItemSettings({
     openAtLogin: enable,
+    openAsHidden: true, // macOS: 后台静默启动
     path: isWin ? process.execPath : undefined,
   });
-  return app.getLoginItemSettings().openAtLogin;
+  const settings = app.getLoginItemSettings();
+  console.log('[开机启动] 设置状态:', enable, '实际状态:', settings.openAtLogin, '路径:', settings.path);
+  return settings.openAtLogin;
 });
 
 // ====== 主题管理 ======
@@ -1779,8 +1847,8 @@ ipcMain.handle('open-reminder', () => {
   if (toolWindows.reminder) { toolWindows.reminder.focus(); return; }
   const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize;
   const w = new BrowserWindow({
-    width: 480, height: 560,
-    x: Math.round(sw/2-240), y: Math.round(sh/2-280),
+    width: 800, height: 560,
+    x: Math.round(sw/2-400), y: Math.round(sh/2-280),
     frame: true, title: '到期提醒',
     webPreferences: { nodeIntegration: false, contextIsolation: true, preload: path.join(__dirname, 'preload.js') }
   });

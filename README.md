@@ -30,7 +30,7 @@
 - 🎨 **深色/浅色主题** 一键切换
 - 🚀 **开机自启动** 支持
 - ⌨️ **快捷键** 快速调用各工具
-- 🔄 **全局快捷键** `Cmd/Ctrl+Shift+F` 显示/隐藏悬浮球
+- 🔄 **全局快捷键** `Cmd/Ctrl+Shift+Z` 显示/隐藏悬浮球
 - 🖥️ **多显示器** 支持
 - 🍎 **macOS & Windows & Linux** 跨平台兼容
 
@@ -102,7 +102,7 @@ npm run build:all
 | `Cmd/Ctrl + Shift + K` | 计算器 |
 | `Cmd/Ctrl + Shift + T` | 翻译 |
 | `Cmd/Ctrl + Shift + U` | 时间戳转换 |
-| `Cmd/Ctrl + Shift + H` | 全局显示/隐藏悬浮球 |
+| `Cmd/Ctrl + Shift + Z` | 全局显示/隐藏悬浮球 |
 | `Cmd/Ctrl + F` | 搜索工具（面板展开时） |
 | `Esc` | 收起面板 |
 

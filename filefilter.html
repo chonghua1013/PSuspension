@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<style>
+*{margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#1e1e2e;color:#cdd6f4;display:flex;flex-direction:column;height:100vh}
+.row{display:flex;align-items:center;gap:8px;padding:10px 14px}
+.row label{font-size:13px;color:#6c7086;min-width:50px}
+.row input,.row .path{flex:1;padding:7px 10px;border-radius:6px;border:1px solid #313244;background:#181825;color:#cdd6f4;font-size:13px;outline:none}
+.row input:focus{border-color:#89b4fa}
+.row button{padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-size:13px;background:#89b4fa;color:#1e1e2e;white-space:nowrap}
+.row button:hover{opacity:.85}
+.btns{display:flex;gap:8px;padding:8px 14px}
+.btns button{flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500}
+.btn-go{background:#a6e3a1;color:#1e1e2e}
+.btn-cc{background:#f38ba8;color:#1e1e2e}
+.btns button:hover{opacity:.85}
+#log{flex:1;overflow-y:auto;padding:10px 14px;font:12px monospace;color:#6c7086;line-height:1.6}
+#log .err{color:#f38ba8}
+#log .ok{color:#a6e3a1}
+</style>
+<style>
+[data-theme="light"] body{background:#f0f7ff;color:#1a3a5c}
+[data-theme="light"] .row label{color:#6b8aaa}
+[data-theme="light"] .row input,[data-theme="light"] .row .path{background:#e1f0ff;color:#1a3a5c;border-color:#d0e5ff}
+[data-theme="light"] .row input:focus{border-color:#4d96ff}
+[data-theme="light"] .row button{background:#4d96ff;color:#fff}
+[data-theme="light"] #log{color:#6b8aaa}
+</style>
+</head>
+<body>
+
+<div class="row"><label>源文件夹</label><span class="path" id="src"></span><button id="btnPickSrc">选择</button></div>
+<div class="row"><label>开始日期</label><input type="date" id="d1"></div>
+<div class="row"><label>结束日期</label><input type="date" id="d2"></div>
+<div class="row"><label>目标目录</label><span class="path" id="dst"></span><button id="btnPickDst">选择</button><button id="btnClearDst" style="background:#f38ba8;margin-left:4px">清空目录</button></div>
+<div class="btns"><button class="btn-go" id="btnGo">开始筛选并复制</button><button class="btn-cc" id="btnClr">清空</button></div>
+<div id="log"></div>
+
+<script>
+const CACHE_KEY='filefilter_cache';
+let src='',dst='',files=[];
+
+function pad(n){return String(n).padStart(2,'0')}
+function dateStr(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+function saveCache(){localStorage.setItem(CACHE_KEY,JSON.stringify({src,dst}))}
+function loadCache(){
+  try{
+    var c=JSON.parse(localStorage.getItem(CACHE_KEY));
+    if(c&&c.src){src=c.src;document.getElementById('src').textContent=src}
+    if(c&&c.dst){dst=c.dst;document.getElementById('dst').textContent=dst}
+  }catch(e){}
+}
+var today=new Date();
+var tomorrow=new Date(today);tomorrow.setDate(tomorrow.getDate()+1);
+document.getElementById('d1').value=dateStr(today);
+document.getElementById('d2').value=dateStr(tomorrow);
+loadCache();
+
+async function pickSrc(){
+  src=await window.electronAPI.selectFolder();
+  if(src){document.getElementById('src').textContent=src;saveCache()}
+}
+async function pickDst(){
+  dst=await window.electronAPI.selectFolder();
+  if(dst){document.getElementById('dst').textContent=dst;saveCache()}
+}
+async function clearDst(){
+  if(!dst){log('请先选择目标目录','err');return}
+  if(!confirm('确定要清空目标目录「'+dst+'」下的所有文件吗？\n此操作不可恢复！'))return
+  try{
+    var r=await window.electronAPI.clearFolder(dst);
+    if(r.error){log('清空失败: '+r.error,'err')}
+    else{log('已清空目录，删除了 '+r.deleted+' 个文件/文件夹','ok')}
+  }catch(e){log('清空失败: '+e,'err')}
+}
+function log(m,c){const l=document.getElementById('log');l.innerHTML+='<div class="'+c+'">'+m+'</div>';l.scrollTop=l.scrollHeight}
+function clr(){document.getElementById('log').innerHTML='';files=[]}
+async function go(){
+  const d1=+new Date(document.getElementById('d1').value);
+  const d2=+new Date(document.getElementById('d2').value+ 'T23:59:59');
+  if(!src||!dst||!d1||!d2)return log('请填写完整信息','err');
+  if(d1>d2)return log('开始日期不能晚于结束日期','err');
+  log('开始扫描 '+src+' ...','');
+  await new Promise(r=>setTimeout(r,20));
+  const r=await window.electronAPI.filterFiles(src,d1,d2);
+  if(r.error){log('扫描失败: '+r.error,'err');return}
+  log('找到 '+r.count+' 个文件','ok');
+  if(r.count===0)return;
+  log('复制到 '+dst+' ...','');
+  await new Promise(r=>setTimeout(r,20));
+  const c=await window.electronAPI.copyFiles(r.files,dst);
+  log('完成! 已复制 '+c.copied+' 个文件','ok');
+}
+
+document.getElementById('btnPickSrc').addEventListener('click',pickSrc);
+document.getElementById('btnPickDst').addEventListener('click',pickDst);
+document.getElementById('btnClearDst').addEventListener('click',clearDst);
+document.getElementById('btnGo').addEventListener('click',go);
+document.getElementById('btnClr').addEventListener('click',clr);
+
+// 主题支持
+(async function(){
+  try{var t=await window.electronAPI.getTheme();document.documentElement.setAttribute('data-theme',t||'light');
+  window.electronAPI.onThemeChanged(function(nt){document.documentElement.setAttribute('data-theme',nt)});}catch(e){}
+})();
+</script>
+</body>
+</html>
